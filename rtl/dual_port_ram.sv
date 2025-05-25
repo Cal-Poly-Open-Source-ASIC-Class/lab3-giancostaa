@@ -1,9 +1,9 @@
-`include "DFFRAM256x32.v"
+`timescale 1ns/1ps
 
 module dual_port_ram (
 
-    input logic clk_i,
-    input logic rst_n_i,
+    input  logic clk_i,
+    input  logic rst_n_i,
 
     /* Port A Wishbone Signals */
     input  logic          pA_wb_stb_i,
@@ -106,6 +106,28 @@ module dual_port_ram (
 
     assign collision = ((pA_ram == pB_ram) && pA_wb_stb_i && pB_wb_stb_i); 
 
+    
+
+    always_comb begin
+        pA_wb_stall_o = 0;
+        pB_wb_stall_o = 0;
+        next_prio = PORT_B;
+
+        if (collision) begin
+            if (prio == PORT_A) begin
+                pB_wb_stall_o = 1;
+                next_prio = PORT_B;
+            end else if (prio == PORT_B) begin
+                pA_wb_stall_o = 1;
+                next_prio = PORT_A;
+            end
+        end
+
+    end
+
+    logic [7 : 0] pA_wb_addr_lsb, pB_wb_addr_lsb;
+    logic pA_hi_arb_ld, pA_lo_arb_ld, pB_hi_arb_ld, pB_lo_arb_ld;
+
     always_ff @ (posedge clk_i) begin
         if (rst_n_i == 0) begin
             prio <= PORT_A;
@@ -123,52 +145,66 @@ module dual_port_ram (
             pB_wb_ack_o   <= 0;
         end else begin
 
-            if (pA_lo_arb_reg || pA_hi_arb_reg)
-                pA_wb_ack_o <= 1;
-            else
-                pA_wb_ack_o <= 0;
+            pA_wb_ack_o   <= 0;
+            pB_wb_ack_o   <= 0;
+            pA_lo_arb_reg <= 0;
+            pA_hi_arb_reg <= 0;
+            pB_lo_arb_reg <= 0;
+            pB_hi_arb_reg <= 0;
 
-            if (pB_lo_arb_reg || pB_hi_arb_reg)
-                pB_wb_ack_o <= 1;
-            else
-                pB_wb_ack_o <= 0;
 
-            if (pA_lo_arb_reg && !pB_lo_arb_reg)
+            if (pA_lo_arb_reg && !pB_lo_arb_reg) begin
                 pA_wb_data_o <= lo_Do0;
-            else if (pA_hi_arb_reg && !pB_hi_arb_reg) 
+                // pA_wb_ack_o <= 1;
+            end 
+            
+            if (pA_hi_arb_reg && !pB_hi_arb_reg) begin 
                 pA_wb_data_o <= hi_Do0;
-
-            if (!pA_lo_arb_reg && pB_lo_arb_reg)
+                // pA_wb_ack_o <= 1;
+            end 
+            
+            if (!pA_lo_arb_reg && pB_lo_arb_reg) begin
                 pB_wb_data_o <= lo_Do0;
-            else if (!pA_hi_arb_reg && pB_hi_arb_reg)
+                // pB_wb_ack_o <= 1;
+            end 
+            
+            if (!pA_hi_arb_reg && pB_hi_arb_reg) begin
                 pB_wb_data_o <= hi_Do0;
-        
+                // pB_wb_ack_o <= 1;
+            end
+            
+            if (pA_lo_arb_ld) begin
+                pA_lo_arb_reg <= pA_lo_arb;
+                pA_wb_ack_o <= 1;
+            end 
+            
+            if (pA_hi_arb_ld) begin
+                pA_hi_arb_reg <= pA_hi_arb;
+                pA_wb_ack_o <= 1;
+            end 
+            
+            if (pB_lo_arb_ld) begin
+                pB_lo_arb_reg <= pB_lo_arb;
+                pB_wb_ack_o <= 1;
+            end
 
-            pA_lo_arb_reg <= pA_lo_arb;
-            pA_hi_arb_reg <= pA_hi_arb;
-            pB_lo_arb_reg <= pB_lo_arb;
-            pB_hi_arb_reg <= pB_hi_arb;
-        end
-    end
-
-    always_comb begin
-        pA_wb_stall_o = 1;
-        pB_wb_stall_o = 1;
-        next_prio = PORT_B;
-
-        if (collision) begin
-            if (prio == PORT_A) begin
-                pB_wb_stall_o = 1;
-                next_prio = PORT_B;
-            end else if (prio == PORT_B) begin
-                pA_wb_stall_o = 1;
-                next_prio = PORT_A;
+            if (pB_hi_arb_ld) begin
+                pB_hi_arb_reg <= pB_hi_arb;
+                pB_wb_ack_o <= 1;
             end
         end
-
     end
 
+    assign pA_wb_addr_lsb = pA_wb_addr_i[7 : 0];
+    assign pB_wb_addr_lsb = pB_wb_addr_i[7 : 0];
+
     always_comb begin
+
+        pA_hi_arb_ld = 0;
+        pA_lo_arb_ld = 0;
+        pB_hi_arb_ld = 0;
+        pB_lo_arb_ld = 0;
+
 
         if (pA_lo_arb && pB_lo_arb) begin
             $display("I shouldn't be here...");
@@ -179,17 +215,21 @@ module dual_port_ram (
 
         /* Lo RAM Input Arbitration */ 
         if (pA_lo_arb && !pB_lo_arb) begin
-            lo_A0  = pA_wb_addr_i[7 : 0];
+            lo_A0  = pA_wb_addr_lsb;
             lo_Di0 = pA_wb_data_i;
             lo_EN0 = pA_wb_stb_i;
             lo_WE0 = pA_WE0;
+
+            pA_lo_arb_ld = 1;
         end else if (!pA_lo_arb && pB_lo_arb) begin
-            lo_A0  = pB_wb_addr_i[7 : 0];
+            lo_A0  = pB_wb_addr_lsb;
             lo_Di0 = pB_wb_data_i;
             lo_EN0 = pB_wb_stb_i;
             lo_WE0 = pB_WE0;
+
+            pB_lo_arb_ld = 1;
         end else begin
-            lo_A0 = {32'hDEADBEEF}[7 : 0];
+            lo_A0 = 8'hDE;
             lo_Di0 = 32'hDEADBEEF;
             lo_EN0 = 0;
             lo_WE0 = 0;
@@ -197,19 +237,23 @@ module dual_port_ram (
 
          /* Hi RAM Input Arbitration */ 
         if (pA_hi_arb && !pB_hi_arb) begin
-            hi_A0  = pA_wb_addr_i[7 : 0];
+            hi_A0  = pA_wb_addr_lsb;
             hi_Di0 = pA_wb_data_i;
             hi_EN0 = pA_wb_stb_i;
             hi_WE0 = pA_WE0;
+
+            pA_hi_arb_ld = 1;
         end else if (!pA_hi_arb && pB_hi_arb) begin
-            hi_A0  = pB_wb_addr_i[7 : 0];
+            hi_A0  = pB_wb_addr_lsb;
             hi_Di0 = pB_wb_data_i;
             hi_EN0 = pB_wb_stb_i;
             hi_WE0 = pB_WE0;
+
+            pB_hi_arb_ld = 1;
         end else begin
-            hi_A0 = {32'hDEADBEEF}[7 : 0];
+            hi_A0 = 8'hDE;
             hi_Di0 = 32'hDEADBEEF;
-            hi_EN0 = 0;
+            hi_EN0 = 0; 
             hi_WE0 = 0;
         end
 
