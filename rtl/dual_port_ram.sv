@@ -141,57 +141,25 @@ module dual_port_ram (
             pA_hi_arb_reg <= 0;
             pB_lo_arb_reg <= 0;
             pB_hi_arb_reg <= 0;
-            pA_wb_ack_o   <= 0;
-            pB_wb_ack_o   <= 0;
         end else begin
-
-            pA_wb_ack_o   <= 0;
-            pB_wb_ack_o   <= 0;
             pA_lo_arb_reg <= 0;
             pA_hi_arb_reg <= 0;
             pB_lo_arb_reg <= 0;
             pB_hi_arb_reg <= 0;
-
-
-            if (pA_lo_arb_reg && !pB_lo_arb_reg) begin
-                pA_wb_data_o <= lo_Do0;
-                // pA_wb_ack_o <= 1;
-            end 
             
-            if (pA_hi_arb_reg && !pB_hi_arb_reg) begin 
-                pA_wb_data_o <= hi_Do0;
-                // pA_wb_ack_o <= 1;
-            end 
-            
-            if (!pA_lo_arb_reg && pB_lo_arb_reg) begin
-                pB_wb_data_o <= lo_Do0;
-                // pB_wb_ack_o <= 1;
-            end 
-            
-            if (!pA_hi_arb_reg && pB_hi_arb_reg) begin
-                pB_wb_data_o <= hi_Do0;
-                // pB_wb_ack_o <= 1;
-            end
-            
-            if (pA_lo_arb_ld) begin
+            if (pA_lo_arb_ld)
                 pA_lo_arb_reg <= pA_lo_arb;
-                pA_wb_ack_o <= 1;
-            end 
-            
-            if (pA_hi_arb_ld) begin
-                pA_hi_arb_reg <= pA_hi_arb;
-                pA_wb_ack_o <= 1;
-            end 
-            
-            if (pB_lo_arb_ld) begin
-                pB_lo_arb_reg <= pB_lo_arb;
-                pB_wb_ack_o <= 1;
-            end
 
-            if (pB_hi_arb_ld) begin
+            
+            if (pA_hi_arb_ld)
+                pA_hi_arb_reg <= pA_hi_arb;
+
+            
+            if (pB_lo_arb_ld) 
+                pB_lo_arb_reg <= pB_lo_arb;
+
+            if (pB_hi_arb_ld) 
                 pB_hi_arb_reg <= pB_hi_arb;
-                pB_wb_ack_o <= 1;
-            end
         end
     end
 
@@ -204,6 +172,12 @@ module dual_port_ram (
         pA_lo_arb_ld = 0;
         pB_hi_arb_ld = 0;
         pB_lo_arb_ld = 0;
+
+        pA_wb_data_o = 0;
+        pA_wb_ack_o  = 0;
+
+        pB_wb_data_o = 0;
+        pB_wb_ack_o  = 0;
 
 
         if (pA_lo_arb && pB_lo_arb) begin
@@ -256,6 +230,28 @@ module dual_port_ram (
             hi_EN0 = 0; 
             hi_WE0 = 0;
         end
+
+        if (pA_lo_arb_reg && !pB_lo_arb_reg) begin
+            pA_wb_data_o = lo_Do0;
+            pA_wb_ack_o  = 1;
+        end 
+        
+        if (pA_hi_arb_reg && !pB_hi_arb_reg) begin 
+            pA_wb_data_o = hi_Do0;
+            pA_wb_ack_o  = 1;
+        end 
+        
+        if (!pA_lo_arb_reg && pB_lo_arb_reg) begin
+            pB_wb_data_o = lo_Do0;
+            pB_wb_ack_o = 1;
+        end 
+        
+        if (!pA_hi_arb_reg && pB_hi_arb_reg) begin
+            pB_wb_data_o = hi_Do0;
+            pB_wb_ack_o = 1;
+        end
+
+        
 
     end
 
