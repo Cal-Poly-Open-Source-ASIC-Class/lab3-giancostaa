@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+// `timescale 1ns/1ps
 
 module tb_dual_port_ram;
 
@@ -65,213 +65,44 @@ module tb_dual_port_ram;
         $dumpvars(0);
     end
 
-    task automatic pA_write(input [8 : 0] pA_addr, [31 : 0]pA_data);
-        // pA_wb_stb_i  = 1;
-        pA_wb_addr_i = pA_addr;
-        pA_wb_sel_i  = 4'hF;
-        pA_wb_we_i   = 1;
-        pA_wb_data_i = pA_data;
-    endtask;
-
-    task automatic pB_write(input [8 : 0] pB_addr, [31 : 0]pB_data);
-        // pB_wb_stb_i  = 1;
-        pB_wb_addr_i = pB_addr;
-        pB_wb_sel_i  = 4'hF;
-        pB_wb_we_i   = 1;
-        pB_wb_data_i = pB_data;
-    endtask;
-
-    task automatic pA_read(input [8 : 0] pA_addr);
-        // pA_wb_stb_i  = 1;
-        pA_wb_addr_i = pA_addr;
-        pA_wb_we_i   = 0;
-    endtask;
-
-    task automatic pB_read(input [8 : 0] pB_addr);
-        // pB_wb_stb_i  = 1;
-        pB_wb_addr_i = pB_addr;
-        pB_wb_we_i   = 0;
-    endtask;
-
-
-    task automatic dport_write_no_col(input logic [8 : 0] pA_addr, logic [31 : 0] pA_data, logic [8 : 0] pB_addr, logic [31 : 0] pB_data);
-        logic [31 : 0] pA_RAM_data, pB_RAM_data;
-        pA_wb_stb_i  = 1;
-        pA_wb_addr_i = pA_addr;
-        pA_wb_sel_i  = 4'hF;
-        pA_wb_we_i   = 1;
-        pA_wb_data_i = pA_data;
-
-        pB_wb_stb_i  = 1;
-        pB_wb_addr_i = pB_addr;
-        pB_wb_sel_i  = 4'hF;
-        pB_wb_we_i   = 1;
-        pB_wb_data_i = pB_data;
-
-        @(posedge clk_i);
-
-        assert(dut.collision == 0) else
-            $fatal(1, "Unexpected write collision");
-            
-        pA_wb_stb_i = 0;
-        pB_wb_stb_i = 0;
-
-        @(posedge clk_i);
-
-        if (pA_addr < 256) 
-            pA_RAM_data = dut.lo_ram.RAM[pA_addr[7 : 0]];
-        else
-            pA_RAM_data = dut.hi_ram.RAM[pA_addr[7 : 0]];
-
-        assert (pA_data == pA_RAM_data) else
-            $fatal(1, "RAM data %0h does not match requested write %0h at address %0d", pA_data, pA_RAM_data, pA_addr);
-
-        
-        if (pB_addr < 256) 
-            pB_RAM_data = dut.lo_ram.RAM[pB_addr[7 : 0]];
-        else
-            pB_RAM_data = dut.hi_ram.RAM[pB_addr[7 : 0]];
-
-        assert (pB_data == pB_RAM_data) else
-            $fatal(1, "RAM data %0d does not match equested write %0h at address %0d", pB_data, pB_RAM_data, pB_addr);
-    
-    endtask;
-
-    task automatic dport_write_col(input logic [8 : 0] pA_addr, logic [31 : 0] pA_data, logic [8 : 0] pB_addr, logic [31 : 0] pB_data);
-        logic [31 : 0] pA_RAM_data, pB_RAM_data;
-        pA_wb_stb_i  = 1;
-        pA_wb_addr_i = pA_addr;
-        pA_wb_sel_i  = 4'hF;
-        pA_wb_we_i   = 1;
-        pA_wb_data_i = pA_data;
-
-        pB_wb_stb_i  = 1;
-        pB_wb_addr_i = pB_addr;
-        pB_wb_sel_i  = 4'hF;
-        pB_wb_we_i   = 1;
-        pB_wb_data_i = pB_data;
-
-        @(posedge clk_i);
-
-        assert(dut.collision == 1) else
-            $fatal(1, "Expected write collision");
-            
-        pA_wb_stb_i = 0;
-        pB_wb_stb_i = 0;
-
-        @(posedge clk_i);
-
-        if (pA_addr < 256) 
-            pA_RAM_data = dut.lo_ram.RAM[pA_addr[7 : 0]];
-        else
-            pA_RAM_data = dut.hi_ram.RAM[pA_addr[7 : 0]];
-
-        // assert (pA_data == pA_RAM_data) else
-        //     $fatal(1, "RAM data %0h does not match requested write %0h at address %0d", pA_data, pA_RAM_data, pA_addr);
-
-        
-        if (pB_addr < 256) 
-            pB_RAM_data = dut.lo_ram.RAM[pB_addr[7 : 0]];
-        else
-            pB_RAM_data = dut.hi_ram.RAM[pB_addr[7 : 0]];
-
-        // assert (pB_data == pB_RAM_data) else
-        //     $fatal(1, "RAM data %0d does not match equested write %0h at address %0d", pB_data, pB_RAM_data, pB_addr);
-    
-    endtask;
-
-    task automatic dport_read_no_col(input logic [8 : 0] pA_addr, [8 : 0] pB_addr);
-        logic [31 : 0] pA_RAM_data, pB_RAM_data;
-
-        pA_wb_stb_i  = 1;
-        pA_wb_addr_i = pA_addr;
-        pA_wb_we_i   = 0;
-
-        pB_wb_stb_i  = 1;
-        pB_wb_addr_i = pB_addr;
-        pB_wb_we_i   = 0;
-
-        @(posedge clk_i);
-
-        assert(dut.collision == 0) else
-            $fatal(1, "Unexpected read collision");
-
-        pA_wb_stb_i = 0;
-        pB_wb_stb_i = 0;
-
-        @(posedge clk_i);
-
-        if (pA_addr < 256) 
-            pA_RAM_data = dut.lo_ram.RAM[pA_addr[7 : 0]];
-        else
-            pA_RAM_data = dut.hi_ram.RAM[pA_addr[7 : 0]];
-
-        assert (pA_wb_data_o == pA_RAM_data) else
-            $fatal(1, "pA output %0d does not match RAM data %0h at address %0d", pA_wb_data_o, pA_RAM_data, pA_addr);
-
-        
-        if (pB_addr < 256) 
-            pB_RAM_data = dut.lo_ram.RAM[pB_addr[7 : 0]];
-        else
-            pB_RAM_data = dut.hi_ram.RAM[pB_addr[7 : 0]];
-
-        assert (pB_wb_data_o == pB_RAM_data) else
-            $fatal(1, "pB output %0d does not match RAM data %0h at address %0d", pB_wb_data_o, pB_RAM_data, pB_addr);
-
-
-    endtask;
-
-    task automatic dport_read_col(input logic [8 : 0] pA_addr, [8 : 0] pB_addr);
-        logic [31 : 0] pA_RAM_data, pB_RAM_data;
-
-        pA_wb_stb_i  = 1;
-        pA_wb_addr_i = pA_addr;
-        pA_wb_we_i   = 0;
-
-        pB_wb_stb_i  = 1;
-        pB_wb_addr_i = pB_addr;
-        pB_wb_we_i   = 0;
-
-        @(posedge clk_i);
-
-        assert(dut.collision == 1) else
-            $fatal(1, "Expected read collision");
-
-        pA_wb_stb_i = 0;
-        pB_wb_stb_i = 0;
-
-        @(posedge clk_i);
-
-        if (pA_addr < 256) 
-            pA_RAM_data = dut.lo_ram.RAM[pA_addr[7 : 0]];
-        else
-            pA_RAM_data = dut.hi_ram.RAM[pA_addr[7 : 0]];
-
-        // assert (pA_wb_data_o == pA_RAM_data) else
-        //     $fatal(1, "pA output %0d does not match RAM data %0h at address %0d", pA_wb_data_o, pA_RAM_data, pA_addr);
-
-        
-        if (pB_addr < 256) 
-            pB_RAM_data = dut.lo_ram.RAM[pB_addr[7 : 0]];
-        else
-            pB_RAM_data = dut.hi_ram.RAM[pB_addr[7 : 0]];
-
-        // assert (pB_wb_data_o == pB_RAM_data) else
-        //     $fatal(1, "pB output %0d does not match RAM data %0h at address %0d", pB_wb_data_o, pB_RAM_data, pB_addr);
-
-
-    endtask;
-
-    task automatic pA_start();
-        
-    endtask;
-
     logic prio;
     initial begin
         prio = dut.prio;
     end
 
+    integer test;
+    logic [8 : 0]  pA_addr, pB_addr;
+    logic [31 : 0] pA_data, pB_data, pA_data_old, pB_data_old;
+
+    task automatic pA_write();
+        // pA_wb_stb_i  = 1;
+        pA_wb_addr_i = pA_addr;
+        pA_wb_sel_i  = 4'hF;
+        pA_wb_we_i   = 1;
+        pA_wb_data_i = pA_data;
+    endtask;
+
+    task automatic pB_write();
+        // pB_wb_stb_i  = 1;
+        pB_wb_addr_i = pB_addr;
+        pB_wb_sel_i  = 4'hF;
+        pB_wb_we_i   = 1;
+        pB_wb_data_i = pB_data;
+    endtask;
+
+    task automatic pA_read();
+        pA_wb_addr_i = pA_addr;
+        pA_wb_we_i   = 0;
+    endtask;
+
+    task automatic pB_read();
+        pB_wb_addr_i = pB_addr;
+        pB_wb_we_i   = 0;
+    endtask;
+
     initial begin
+        
+        
         // Test Goes Here
         clk_i = 0;
 
@@ -281,55 +112,275 @@ module tb_dual_port_ram;
         @(posedge clk_i);
         rst_n_i = 1;
 
-        pA_wb_stb_i  = 0;
-        pA_wb_addr_i = 0;
-        pA_wb_sel_i  = 0;
-        pA_wb_we_i   = 0;
-        pA_wb_data_i = 0;
+        // pA_wb_stb_i  = 0;
+        // pA_wb_addr_i = 0;
+        // pA_wb_sel_i  = 0;
+        // pA_wb_we_i   = 0;
+        // pA_wb_data_i = 0;
 
-        pB_wb_stb_i  = 0;
-        pB_wb_addr_i = 0;
-        pB_wb_sel_i  = 0;
-        pB_wb_we_i   = 0;
-        pB_wb_data_i = 0;
+        // pB_wb_stb_i  = 0;
+        // pB_wb_addr_i = 0;
+        // pB_wb_sel_i  = 0;
+        // pB_wb_we_i   = 0;
+        // pB_wb_data_i = 0;
 
-        @(posedge clk_i);
+        // @(posedge clk_i);
 
-        /* Write to both RAMs, no collision */
-        dport_write_no_col(69, 32'hCAFEBABE, 256, 32'hEBABEFAC); 
+        // /* Write to both RAMs, no collision */
+        // dport_write_no_col(69, 32'hCAFEBABE, 256, 32'hEBABEFAC); 
 
-        /* Read from both RAMs, no collision */
-        dport_read_no_col(69, 256);
+        // /* Read from both RAMs, no collision */
+        // dport_read_no_col(69, 256);
 
-        /* Write to single RAM, collision */
-        dport_write_col(420, "poop", 420, "butt");
+        // /* Write to single RAM, collision */
+        // dport_write_col(420, "poop", 420, "butt");
 
-        @(posedge clk_i);
-        @(posedge clk_i);
-        @(posedge clk_i);
-        @(posedge clk_i);
-        @(posedge clk_i);
+        // @(posedge clk_i);
+        // @(posedge clk_i);
+        // @(posedge clk_i);
+        // @(posedge clk_i);
+        // @(posedge clk_i);
   
         /* Replicate collision waveform from assignment */
+
+
         pA_wb_stb_i = 1;
         pB_wb_stb_i = 1;
-        pA_write(9'h0, 32'h01234567);
-        pB_write(9'h8, 32'h89ABCDEF);
+
+        /* Tests 1 - 8 test both ports writing to lo_ram at the same time */
+        pA_addr = 9'h0;
+        pB_addr = 9'h1;
+        
+        /* ------------ TEST 1 ------------ */
+        test = 1;
+
+        pB_data_old = 32'h0;
+        pB_data = 32'h89ABCDEF;
+
+        pA_data_old = 32'h0;
+        pA_data = 32'h01234567;
+        
+        pA_write();
+        pB_write();
         @(posedge clk_i);
-        pB_write(9'hC, 32'h89ABCDEF);
+        @(negedge clk_i);
+        verify_ram(test, pB_addr, pB_data); // Priority = Port B
+
+        /* ------------ TEST 2 ------------ */
+        test = 2;
+        pB_data_old = pB_data;
+        pB_data = pA_data;
+
+        pB_write();
         @(posedge clk_i);
-        pA_write(9'h4, 32'h01234567);
+        @(negedge clk_i);
+        verify_ram(test, pA_addr, pA_data);    // Priority = Port A
+        verify_ram(test, pB_addr, pB_data_old);
+
+        /* ------------ TEST 3 ------------ */
+        test = 3;
+        pA_data_old = pA_data;
+        pA_data = pB_data_old;
+
+        pA_write();
         @(posedge clk_i);
-        pB_write(9'h10, 32'h89ABCDEF);
+        @(negedge clk_i);
+        verify_ram(test, pA_addr, pA_data_old);
+        verify_ram(test, pB_addr, pB_data);    // Priority = Port B
+        
+        /* ------------ TEST 4 ------------ */
+        test = 4;
+        pB_data_old = pB_data;
+        pB_data = pA_data_old;
+
+        pB_write();
         @(posedge clk_i);
-        pA_write(9'h8, 32'h01234567);
+        @(negedge clk_i);
+        verify_ram(test, pA_addr, pA_data);    // Priority = Port A
+        verify_ram(test, pB_addr, pB_data_old);
+
+        /* ------------ TEST 5 ------------ */
+        test = 5;
+        pA_data_old = pA_data;
+        pA_data = pB_data_old;
+
+        pA_write();
         @(posedge clk_i);
-        pB_write(9'h14, 32'h89ABCDEF);
+        @(negedge clk_i);
+        verify_ram(test, pA_addr, pA_data_old);
+        verify_ram(test, pB_addr, pB_data);    // Priority = Port B
+
+        /* ------------ TEST 6 ------------ */
+        test = 6;
+        pB_data_old = pB_data;
+        pB_data = pA_data_old;
+
+        pB_write();
         @(posedge clk_i);
-        pA_write(9'hc, 32'h01234567);
-    
+        @(negedge clk_i);
+        verify_ram(test, pA_addr, pA_data);    // Priority = Port A
+        verify_ram(test, pB_addr, pB_data_old);
+
+        /* ------------ TEST 7 ------------ */
+        test = 7;
+        pA_data_old = pA_data;
+        pA_data = pB_data_old;
+
+        pA_write();
         @(posedge clk_i);
+        @(negedge clk_i);
+        verify_ram(test, pA_addr, pA_data_old);
+        verify_ram(test, pB_addr, pB_data);    // Priority = Port B
+
+        /* ------------ TEST 8 ------------ */
+        test = 8;
+        @(posedge clk_i);
+        @(negedge clk_i);
+        verify_ram(test, pA_addr, pA_data); // Priority = Port A
+
+        @(posedge clk_i);
+
+        /* Tests 9 - 16 test both ports writing to hi_ram at the same time */
+        pA_addr = 9'h100;   // 100
+        pB_addr = 9'h1FF; // 511
+        
+        /* ------------ TEST 9 ------------ */
+        test = 9;
+        pB_data_old = 32'h0;
+        pB_data = 32'h89ABCDEF;
+
+        pA_data_old = 32'h0;
+        pA_data = 32'h01234567;
+        
+        pA_write();
+        pB_write();
+        @(posedge clk_i);
+        @(negedge clk_i);
+        verify_ram(test, pA_addr, pA_data); // Priority = Port A
+
+        /* ------------ TEST 10 ------------ */
+        test = 10;
+        
+        pA_data_old = pA_data;
+        pA_data = pB_data;
+
+        pA_write();
+        @(posedge clk_i);
+        @(negedge clk_i);
+        verify_ram(test, pA_addr, pA_data_old);    
+        verify_ram(test, pB_addr, pB_data); // Priority = Port B
+
+        /* ------------ TEST 11 ------------ */
+        test = 11;
+        pB_data_old = pB_data;
+        pB_data = pA_data_old;
+
+        pB_write();
+        @(posedge clk_i);
+        @(negedge clk_i);
+        verify_ram(test, pA_addr, pA_data); // Priority = Port A
+        verify_ram(test, pB_addr, pB_data_old);    
+        
+        /* ------------ TEST 12 ------------ */
+        test = 12;
+        pA_data_old = pA_data;
+        pA_data = pB_data_old;
+
+        pA_write();
+        @(posedge clk_i);
+        @(negedge clk_i);
+        verify_ram(test, pA_addr, pA_data_old);    
+        verify_ram(test, pB_addr, pB_data); // Priority = Port B
+
+        /* ------------ TEST 13 ------------ */
+        test = 13;
+        pB_data_old = pB_data;
+        pB_data = pA_data_old;
+
+        pB_write();
+        @(posedge clk_i);
+        @(negedge clk_i);
+        verify_ram(test, pA_addr, pA_data); // Priority = Port A
+        verify_ram(test, pB_addr, pB_data_old);    
+
+        /* ------------ TEST 14 ------------ */
+        test = 14;
+        pA_data_old = pA_data;
+        pA_data = pB_data_old;
+
+        pA_write();
+        @(posedge clk_i);
+        @(negedge clk_i);
+        verify_ram(test, pA_addr, pA_data_old);    
+        verify_ram(test, pB_addr, pB_data); // Priority = Port B
+
+        /* ------------ TEST 15 ------------ */
+        test = 15;
+        pB_data_old = pB_data;
+        pB_data = pA_data_old;
+
+        pB_write();
+        @(posedge clk_i);
+        @(negedge clk_i);
+        verify_ram(test, pA_addr, pA_data); // Priority = Port A
+        verify_ram(test, pB_addr, pB_data_old);    
+
+        /* ------------ TEST 16 ------------ */
+        test = 16;
+        @(posedge clk_i);
+        @(negedge clk_i);
+        verify_ram(test, pB_addr, pB_data_old);
+
+        @(posedge clk_i);
+
+        pA_wb_stb_i = 0;
+        pB_wb_stb_i = 0;
+
+        @(posedge clk_i);
+        
+        pA_addr = 9'h0;
+        pB_addr = 9'h1;
+
+        /* ------------ TEST 17 ------------ */
+        test = 17;
+        pA_read();
+        pB_read();
+
+        pA_wb_stb_i = 1;
+        pB_wb_stb_i = 1;
+        @(posedge clk_i);
+        @(negedge clk_i);
+        verify_read(test, pB_addr, pB_wb_data_o); // Priority = Port B
+
+        @(posedge clk_i)
+        @(negedge clk_i);
+        verify_read(test, pA_addr, pA_wb_data_o);
+        
+
+
         $finish();
     end
 
+    task automatic verify_ram(input integer test_no, [8 : 0]addr, [31 : 0]exp);
+        logic [31 : 0] act;
+
+        act = dut.lo_ram.RAM[addr[7 : 0]];
+        if (addr > 255)
+            act = dut.hi_ram.RAM[addr[7 : 0]];
+
+        assert (act == exp) else
+            $fatal(1, "Test %0d: Memory contents 0x%0h does not match expected data 0x%0h at address 0x%0h", test_no, act, exp, addr);
+    endtask;
+
+    task automatic verify_read(input integer test_no, [8 : 0]addr, [31 : 0]act);
+        logic [31 : 0] exp;
+
+        exp = dut.lo_ram.RAM[addr[7 : 0]];
+        if (addr > 255)
+            exp = dut.hi_ram.RAM[addr[7 : 0]];
+
+        assert (act == exp) else
+            $fatal(1, "Test %0d: Read data 0x%0h does not match memory contents 0x%0h at address 0x%0h", test_no, act, exp, addr);
+
+    endtask;
 endmodule
