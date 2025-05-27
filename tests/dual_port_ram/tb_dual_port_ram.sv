@@ -115,6 +115,9 @@ module tb_dual_port_ram;
         pB_wb_stb_i = 1;
         
         /* ------------ TEST 1 ------------ */
+        /* These tests test stalling and delegation by writing to the same memory macro.
+        Though, when jumping from lo_ram to hi_ram there will be a transaction with no collision */
+
         test_no = 1;
 
         pA_data = 32'h1FF;
@@ -161,6 +164,8 @@ module tb_dual_port_ram;
         @(negedge clk_i);
         
         /* ------------ TEST 2 ------------ */
+        /* These tests test stalling and delegation by reading from the same memory macro.
+        Though, when jumping from lo_ram to hi_ram there will be a transaction with no collision */
 
         pA_data_exp = 32'h1FF;
         pB_data_exp = 32'h1FE;
