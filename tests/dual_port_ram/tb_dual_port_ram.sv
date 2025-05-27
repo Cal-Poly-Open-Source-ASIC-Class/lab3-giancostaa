@@ -50,6 +50,12 @@ module tb_dual_port_ram;
         .pB_wb_data_o (pB_wb_data_o)
     );
 
+    typedef enum logic [1 : 0] 
+    {
+        PORT_B  = 2'h0,
+        PORT_A  = 2'h1,
+        PORT_AB = 2'h2
+    } port_t;
 
     // Sample to drive clock
     localparam CLK_PERIOD = 20;
@@ -65,17 +71,11 @@ module tb_dual_port_ram;
         $dumpvars(0);
     end
 
-    logic prio;
-    initial begin
-        prio = dut.prio;
-    end
-
-    integer test;
+    integer test_no;
     logic [8 : 0]  pA_addr, pB_addr;
-    logic [31 : 0] pA_data, pB_data, pA_data_old, pB_data_old;
+    logic [31 : 0] pA_data, pB_data, pA_data_exp, pB_data_exp;
 
     task automatic pA_write();
-        // pA_wb_stb_i  = 1;
         pA_wb_addr_i = pA_addr;
         pA_wb_sel_i  = 4'hF;
         pA_wb_we_i   = 1;
@@ -83,7 +83,6 @@ module tb_dual_port_ram;
     endtask;
 
     task automatic pB_write();
-        // pB_wb_stb_i  = 1;
         pB_wb_addr_i = pB_addr;
         pB_wb_sel_i  = 4'hF;
         pB_wb_we_i   = 1;
@@ -100,9 +99,9 @@ module tb_dual_port_ram;
         pB_wb_we_i   = 0;
     endtask;
 
+    port_t prio;
+
     initial begin
-        
-        
         // Test Goes Here
         clk_i = 0;
 
@@ -112,256 +111,134 @@ module tb_dual_port_ram;
         @(posedge clk_i);
         rst_n_i = 1;
 
-        // pA_wb_stb_i  = 0;
-        // pA_wb_addr_i = 0;
-        // pA_wb_sel_i  = 0;
-        // pA_wb_we_i   = 0;
-        // pA_wb_data_i = 0;
-
-        // pB_wb_stb_i  = 0;
-        // pB_wb_addr_i = 0;
-        // pB_wb_sel_i  = 0;
-        // pB_wb_we_i   = 0;
-        // pB_wb_data_i = 0;
-
-        // @(posedge clk_i);
-
-        // /* Write to both RAMs, no collision */
-        // dport_write_no_col(69, 32'hCAFEBABE, 256, 32'hEBABEFAC); 
-
-        // /* Read from both RAMs, no collision */
-        // dport_read_no_col(69, 256);
-
-        // /* Write to single RAM, collision */
-        // dport_write_col(420, "poop", 420, "butt");
-
-        // @(posedge clk_i);
-        // @(posedge clk_i);
-        // @(posedge clk_i);
-        // @(posedge clk_i);
-        // @(posedge clk_i);
-  
-        /* Replicate collision waveform from assignment */
-
-
         pA_wb_stb_i = 1;
         pB_wb_stb_i = 1;
-
-        /* Tests 1 - 8 test both ports writing to lo_ram at the same time */
-        pA_addr = 9'h0;
-        pB_addr = 9'h1;
         
         /* ------------ TEST 1 ------------ */
-        test = 1;
+        test_no = 1;
 
-        pB_data_old = 32'h0;
-        pB_data = 32'h89ABCDEF;
-
-        pA_data_old = 32'h0;
-        pA_data = 32'h01234567;
+        pA_data = 32'h1FF;
+        pB_data = 32'h0;
         
-        pA_write();
-        pB_write();
+        for (int i = 0; i < 511; i++) begin
+            pA_addr = i;
+            pB_addr = i + 1;
+
+            prio = port_t'(dut.prio);
+            write_mem(PORT_AB);
+
+            if (i == 255 || i == 511) begin
+                assert(dut.collision == 0) 
+                    else $fatal(1, "Test %0d: Unexpected collision", test_no);
+                        
+            end
+
+            if (prio == PORT_A) begin
+                verify_ram(PORT_A, pA_addr, pA_data);
+                
+                @(posedge clk_i);
+                @(negedge clk_i);
+                verify_ram(PORT_B, pB_addr, pB_data);                
+            end else if (prio == PORT_B) begin
+                verify_ram(PORT_B, pB_addr, pB_data);
+
+                @(posedge clk_i);
+                @(negedge clk_i);
+                verify_ram(PORT_A, pA_addr, pA_data);                
+            end
+
+            pA_data--;
+            pB_data++;
+
+            $display("TEST %0d PASSED", test_no);
+            test_no++;
+        end
+
+        pA_wb_we_i = 0;
+        pB_wb_we_i = 0;
+
         @(posedge clk_i);
         @(negedge clk_i);
-        verify_ram(test, pB_addr, pB_data); // Priority = Port B
-
+        
         /* ------------ TEST 2 ------------ */
-        test = 2;
-        pB_data_old = pB_data;
-        pB_data = pA_data;
 
-        pB_write();
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_ram(test, pA_addr, pA_data);    // Priority = Port A
-        verify_ram(test, pB_addr, pB_data_old);
+        pA_data_exp = 32'h1FF;
+        pB_data_exp = 32'h1FE;
+       
+        for (int i = 0; i < 510; i++) begin
+            pA_addr = i;
+            pB_addr = i + 1;
 
-        /* ------------ TEST 3 ------------ */
-        test = 3;
-        pA_data_old = pA_data;
-        pA_data = pB_data_old;
+            prio = port_t'(dut.prio);
+            read_mem(PORT_AB);
 
-        pA_write();
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_ram(test, pA_addr, pA_data_old);
-        verify_ram(test, pB_addr, pB_data);    // Priority = Port B
+            if (i == 255 || i == 511) begin
+                assert(dut.collision == 0) 
+                    else $fatal(1, "Test %0d: Unexpected collision", test_no);
+            end
+
+            if (prio == PORT_A) begin
+                verify_read(PORT_A, pA_data_exp);
+                
+                @(negedge clk_i);
+                verify_read(PORT_B, pB_data_exp);                
+            end else if (prio == PORT_B) begin
+                verify_read(PORT_B, pB_data_exp);
+
+                @(negedge clk_i);
+                verify_read(PORT_A, pA_data_exp);                
+            end
+
+            pA_data_exp--;
+            pB_data_exp--;
+
+            $display("TEST %0d PASSED", test_no);
+            test_no++;
+        end
         
-        /* ------------ TEST 4 ------------ */
-        test = 4;
-        pB_data_old = pB_data;
-        pB_data = pA_data_old;
-
-        pB_write();
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_ram(test, pA_addr, pA_data);    // Priority = Port A
-        verify_ram(test, pB_addr, pB_data_old);
-
-        /* ------------ TEST 5 ------------ */
-        test = 5;
-        pA_data_old = pA_data;
-        pA_data = pB_data_old;
-
-        pA_write();
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_ram(test, pA_addr, pA_data_old);
-        verify_ram(test, pB_addr, pB_data);    // Priority = Port B
-
-        /* ------------ TEST 6 ------------ */
-        test = 6;
-        pB_data_old = pB_data;
-        pB_data = pA_data_old;
-
-        pB_write();
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_ram(test, pA_addr, pA_data);    // Priority = Port A
-        verify_ram(test, pB_addr, pB_data_old);
-
-        /* ------------ TEST 7 ------------ */
-        test = 7;
-        pA_data_old = pA_data;
-        pA_data = pB_data_old;
-
-        pA_write();
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_ram(test, pA_addr, pA_data_old);
-        verify_ram(test, pB_addr, pB_data);    // Priority = Port B
-
-        /* ------------ TEST 8 ------------ */
-        test = 8;
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_ram(test, pA_addr, pA_data); // Priority = Port A
-
-        @(posedge clk_i);
-
-        /* Tests 9 - 16 test both ports writing to hi_ram at the same time */
-        pA_addr = 9'h100;   // 100
-        pB_addr = 9'h1FF; // 511
-        
-        /* ------------ TEST 9 ------------ */
-        test = 9;
-        pB_data_old = 32'h0;
-        pB_data = 32'h89ABCDEF;
-
-        pA_data_old = 32'h0;
-        pA_data = 32'h01234567;
-        
-        pA_write();
-        pB_write();
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_ram(test, pA_addr, pA_data); // Priority = Port A
-
-        /* ------------ TEST 10 ------------ */
-        test = 10;
-        
-        pA_data_old = pA_data;
-        pA_data = pB_data;
-
-        pA_write();
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_ram(test, pA_addr, pA_data_old);    
-        verify_ram(test, pB_addr, pB_data); // Priority = Port B
-
-        /* ------------ TEST 11 ------------ */
-        test = 11;
-        pB_data_old = pB_data;
-        pB_data = pA_data_old;
-
-        pB_write();
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_ram(test, pA_addr, pA_data); // Priority = Port A
-        verify_ram(test, pB_addr, pB_data_old);    
-        
-        /* ------------ TEST 12 ------------ */
-        test = 12;
-        pA_data_old = pA_data;
-        pA_data = pB_data_old;
-
-        pA_write();
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_ram(test, pA_addr, pA_data_old);    
-        verify_ram(test, pB_addr, pB_data); // Priority = Port B
-
-        /* ------------ TEST 13 ------------ */
-        test = 13;
-        pB_data_old = pB_data;
-        pB_data = pA_data_old;
-
-        pB_write();
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_ram(test, pA_addr, pA_data); // Priority = Port A
-        verify_ram(test, pB_addr, pB_data_old);    
-
-        /* ------------ TEST 14 ------------ */
-        test = 14;
-        pA_data_old = pA_data;
-        pA_data = pB_data_old;
-
-        pA_write();
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_ram(test, pA_addr, pA_data_old);    
-        verify_ram(test, pB_addr, pB_data); // Priority = Port B
-
-        /* ------------ TEST 15 ------------ */
-        test = 15;
-        pB_data_old = pB_data;
-        pB_data = pA_data_old;
-
-        pB_write();
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_ram(test, pA_addr, pA_data); // Priority = Port A
-        verify_ram(test, pB_addr, pB_data_old);    
-
-        /* ------------ TEST 16 ------------ */
-        test = 16;
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_ram(test, pB_addr, pB_data_old);
-
-        @(posedge clk_i);
-
-        pA_wb_stb_i = 0;
-        pB_wb_stb_i = 0;
-
-        @(posedge clk_i);
-        
-        pA_addr = 9'h0;
-        pB_addr = 9'h1;
-
-        /* ------------ TEST 17 ------------ */
-        test = 17;
-        pA_read();
-        pB_read();
-
-        pA_wb_stb_i = 1;
-        pB_wb_stb_i = 1;
-        @(posedge clk_i);
-        @(negedge clk_i);
-        verify_read(test, pB_addr, pB_wb_data_o); // Priority = Port B
-
-        @(posedge clk_i)
-        @(negedge clk_i);
-        verify_read(test, pA_addr, pA_wb_data_o);
-        
-
-
         $finish();
     end
 
-    task automatic verify_ram(input integer test_no, [8 : 0]addr, [31 : 0]exp);
+    task static write_mem(input port_t port);
+        if (port == PORT_AB) begin
+            pA_write();
+            pB_write();
+        end else if (port == PORT_A) 
+            pA_write();
+        else
+            pB_write();
+        
+        @(posedge clk_i);
+        @(negedge clk_i);
+
+        if (port == PORT_AB) begin
+            assert(pA_wb_ack_o || pB_wb_ack_o)
+                else $fatal(1, "Error: Neither Port acking on a collision");
+        end else if (port == PORT_A) begin
+            assert(!pB_wb_ack_o) 
+                else $fatal(1, "Error: Port B should not ack on a Port A write");
+        end else
+            assert(!pA_wb_ack_o)
+                else $fatal(1, "Error: Port A should not ack on a Port B write");
+
+    endtask;
+
+    task static read_mem(input port_t port);
+        if (port == PORT_AB) begin
+            pA_read();
+            pB_read();
+        end else if (port == PORT_A) 
+            pA_read();
+        else
+            pB_read();
+        
+        @(posedge clk_i);
+        @(negedge clk_i);
+
+    endtask;
+    
+
+    task automatic verify_ram(input port_t port, [8 : 0]addr, [31 : 0]exp);
         logic [31 : 0] act;
 
         act = dut.lo_ram.RAM[addr[7 : 0]];
@@ -369,18 +246,18 @@ module tb_dual_port_ram;
             act = dut.hi_ram.RAM[addr[7 : 0]];
 
         assert (act == exp) else
-            $fatal(1, "Test %0d: Memory contents 0x%0h does not match expected data 0x%0h at address 0x%0h", test_no, act, exp, addr);
+            $fatal(1, "Test %0d: Memory contents 0x%0h does not match expected Port %c data 0x%0h at address 0x%0h", test_no, act, port_t'(port) == PORT_A ? "A" : "B", exp, addr);
     endtask;
 
-    task automatic verify_read(input integer test_no, [8 : 0]addr, [31 : 0]act);
-        logic [31 : 0] exp;
+    task automatic verify_read(input port_t port, [31 : 0]exp);
+        logic [31 : 0] act;
 
-        exp = dut.lo_ram.RAM[addr[7 : 0]];
-        if (addr > 255)
-            exp = dut.hi_ram.RAM[addr[7 : 0]];
+        act = pB_wb_data_o;
+        if (port == PORT_A)
+            act = pA_wb_data_o;
 
         assert (act == exp) else
-            $fatal(1, "Test %0d: Read data 0x%0h does not match memory contents 0x%0h at address 0x%0h", test_no, act, exp, addr);
+            $fatal(1, "Test %0d: Read data 0x%0h does not match expected data 0x%0h", test_no, act, exp);
 
     endtask;
 endmodule

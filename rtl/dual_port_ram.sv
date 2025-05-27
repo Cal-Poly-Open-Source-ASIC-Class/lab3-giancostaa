@@ -191,14 +191,6 @@ module dual_port_ram (
             end
         end
 
-
-        if (pA_lo_arb && pB_lo_arb) begin
-            $display("I shouldn't be here...");
-        end else if (pA_hi_arb && pB_hi_arb) begin
-            $display("I shouldn't be here either...");
-        end
-
-
         /* Lo RAM Input Arbitration */ 
         if (pA_lo_arb && !pB_lo_arb) begin
             lo_A0  = pA_wb_addr_lsb;

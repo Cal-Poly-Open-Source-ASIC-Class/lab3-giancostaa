@@ -22,7 +22,7 @@
       "DFFRAM256x32": {
           "instances": {
             "lo_ram": {
-                "location": [200, 200],
+                "location": [200, 100],
                 "orientation": "FS"
             },
             "hi_ram": {
